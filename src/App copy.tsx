@@ -3,41 +3,27 @@ import HeartRateControls from "./components/HeartRateControls";
 import HeartAnimation from "./components/HeartAnimation";
 import "./App.css";
 
-enum HeartRateBordersEnum {
-  MIN = 26,
-  MAX = 250,
-}
+// Setup WebSocket mock
+// import { setupWorker } from "msw/browser";
+// import { setupServer } from "msw/node";
+// import { handlers } from "./mocks/handlers";
+import { handlers } from './mocks/handlers';
 
-enum HeartRateStatusEnum {
-  Normal = "Normal",
-  Elevated = "Elevated",
-  High = "High",
-}
 
-enum HeartRateColorEnum {
-  Normal = "#4CAF50", // Green
-  Elevated = "#FFC107", // Yellow
-  High = "#F44336", // Red
-}
-interface HeartRateData {
-  heartRate: number;
-  status: HeartRateStatusEnum;
-  color: HeartRateColorEnum;
-}
+// // Setup MSW worker
+// const worker = setupWorker(handlers);
+// worker.start();
+
 
 const App: React.FC = () => {
-  const [heartData, setHeartData] = useState<HeartRateData>({
-    heartRate: 70,
-    status: HeartRateStatusEnum.Normal,
-    color: HeartRateColorEnum.Normal,
-  });
+  const [heartRate, setHeartRate] = useState<number>(70);
   const [isServerMode, setIsServerMode] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const ws = useRef<WebSocket | null>(null);
 
   // Heart rate validation function
   const validateHeartRate = (rate: number): boolean => {
-    if (rate < HeartRateBordersEnum.MIN || rate > HeartRateBordersEnum.MAX) {
+    if (rate < 26 || rate > 250) {
       setError(`Heart rate must be between 26 and 250 BPM (current: ${rate})`);
       return false;
     }
@@ -47,29 +33,15 @@ const App: React.FC = () => {
 
   // Update heart rate with validation
   const updateHeartRate = (newRate: number) => {
-    if (validateHeartRate(newRate)) {
-      setHeartData((prevData) => ({
-        ...prevData,
-        heartRate: newRate,
-        status:
-          newRate <= 110
-            ? HeartRateStatusEnum.Normal
-            : newRate <= 180
-            ? HeartRateStatusEnum.Elevated
-            : HeartRateStatusEnum.High,
-        color:
-          newRate <= 110
-            ? HeartRateColorEnum.Normal
-            : newRate <= 180
-            ? HeartRateColorEnum.Elevated
-            : HeartRateColorEnum.High,
-      }));
+    if (!isServerMode && validateHeartRate(newRate)) {
+      setHeartRate(newRate);
     }
   };
 
   // Handle WebSocket connection
   useEffect(() => {
     if (isServerMode) {
+      
       ws.current = new WebSocket("ws://localhost:8080");
 
       ws.current.onopen = () => {
@@ -79,9 +51,8 @@ const App: React.FC = () => {
       ws.current.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          console.log("Received data:", data);
           if (data.heartRate !== undefined) {
-            updateHeartRate(data.heartRate);
+            setHeartRate(data.heartRate);
             validateHeartRate(data.heartRate); // Just for error display
           }
         } catch (error) {
@@ -103,21 +74,24 @@ const App: React.FC = () => {
     }
   }, [isServerMode]);
 
+  // Calculate heart color based on rate
+  const getHeartColor = (): string => {
+    if (heartRate <= 110) return "#4CAF50"; // Green
+    if (heartRate <= 180) return "#FFC107"; // Yellow
+    return "#F44336"; // Red
+  };
 
   return (
     <div className="app">
       <h1>Heart Rate Monitor</h1>
 
       <div className="heart-container">
-        <HeartAnimation
-          heartRate={heartData.heartRate}
-          color={heartData.color}
-        />
+        <HeartAnimation heartRate={heartRate} color={getHeartColor()} />
       </div>
 
       <div className="controls-container">
         <HeartRateControls
-          heartRate={heartData.heartRate}
+          heartRate={heartRate}
           updateHeartRate={updateHeartRate}
           isServerMode={isServerMode}
           setIsServerMode={setIsServerMode}
@@ -128,11 +102,16 @@ const App: React.FC = () => {
         <div className="heart-rate-display">
           <h2>
             Current Heart Rate:{" "}
-            <span style={{ color: heartData.color }}>
-              {heartData.heartRate} BPM
-            </span>
+            <span style={{ color: getHeartColor() }}>{heartRate} BPM</span>
           </h2>
-          <div className="heart-rate-status">Status: {heartData.status}</div>
+          <div className="heart-rate-status">
+            Status:{" "}
+            {heartRate <= 110
+              ? "Normal"
+              : heartRate <= 180
+              ? "Elevated"
+              : "High"}
+          </div>
         </div>
       </div>
     </div>
