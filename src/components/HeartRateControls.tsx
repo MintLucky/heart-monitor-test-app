@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './HeartRateControls.css';
 
 interface HeartRateControlsProps {
@@ -34,6 +34,11 @@ const HeartRateControls: React.FC<HeartRateControlsProps> = ({
   const handleModeToggle = () => {
     setIsServerMode(!isServerMode);
   };
+
+  useEffect(() => {
+    setInputValue(heartRate.toString());
+  }
+  , [heartRate]);
 
   return (
     <div className="heart-rate-controls">
